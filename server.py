@@ -57,7 +57,6 @@ def graph_data():
     confidence  = float(cfg.get('confidence', 0.4))
     include_src   = set(cfg.get('edgeSources', EDGE_SOURCES))
     exclude_src   = EDGE_SOURCES - include_src                 # pass to STRING API
-    print(effect)
 
     df = filter_modifiers(modifiers, analyses=analyses, effect=effect)
     string = StringAPI(

@@ -161,9 +161,7 @@ const ClusterEnrichment = forwardRef<ClusterEnrichmentHandle, Props>(
 
   async function exportFigures() {
     const graphSVG = graphRef.current?.getCy()?.svg({ full: false });
-    const barplotSVG = document.querySelector(
-      'svg.recharts-surface'
-    ) as SVGElement | null;
+    const barplotSVG = barplorRef.current?.getSVG?.() as SVGElement | null;
 
     if (!graphSVG || !barplotSVG) {
       alert('One of the visualizations is not available for export.');

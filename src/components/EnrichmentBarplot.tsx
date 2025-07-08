@@ -44,7 +44,7 @@ interface Props {
 export interface EnrichmentBarplotHandle {
   highlightCluster(cid: number | null): void;
   highlightGene(gid: string | null): void;
-  exportAsSVG(): void;
+  getSVG(): SVGElement;
 }
 
 const MAX_LABEL = 50;
@@ -63,7 +63,7 @@ const MARGIN = { top: 40, right: 20, bottom: 40, left: 270 };
 
 const EnrichmentBarplot = forwardRef<EnrichmentBarplotHandle, Props>(
   ({ data, palette, onBarHover, fdrThreshold = 0.05 }, ref) => {
-    const svgRef = useRef<SVGSVGElement | null>(null);
+    const svgRef = useRef<SVGElement | null>(null);
     const [hoverCid, setHoverCid] = useState<number | null>(null);
     const [activeCid, setActiveCid] = useState<number | null>(null);
     const [activeGene, setActiveGene] = useState<string | null>(null);
@@ -103,16 +103,8 @@ const EnrichmentBarplot = forwardRef<EnrichmentBarplotHandle, Props>(
         setActiveCid(null);
         setActiveGene(g);
       },
-      exportAsSVG() {
-        if (!svgRef.current) return;
-        const svgString = new XMLSerializer().serializeToString(svgRef.current);
-        const blob = new Blob([svgString], { type: 'image/svg+xml' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = 'enrichment.svg';
-        a.click();
-        URL.revokeObjectURL(url);
+      getSVG() {
+        return svgRef.current;
       },
     }));
 
