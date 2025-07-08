@@ -144,7 +144,7 @@ def get_node_details(node_id):
         })
 
 # @app.route('/api/gene-table/<node_ids>')
-@app.route('/api/gene-table/')
+@app.route('/api/gene-table')
 def get_gene_table():
     """This endpoint serves detailed information for multiple nodes."""
     # ids = node_ids.split(',')
