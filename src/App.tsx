@@ -8,7 +8,7 @@ import GeneTable, {
 import DynamicContainer from "./components/DynamicContainer";
 import "./index.css";
 
-const API = "http://slytherin.nri.bcm.edu/api"
+const API = "http://slytherin.nri.bcm.edu:5000/api"
 
 // ✅ Drop the hero header for now; focus on the workspace
 export function App() {
