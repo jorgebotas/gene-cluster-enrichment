@@ -1,46 +1,64 @@
+// bun-server.ts
 import { serve } from "bun";
 import index from "./index.html";
 
-const server = serve({
-  routes: {
-    // Serve index.html for all unmatched routes.
-    "/*": index,
+/**
+ * Where your real API is listening.
+ * • Keep it in an env var so prod/staging/dev can diverge cleanly.
+ * • Use a URL object so we can preserve host/port/query with zero string-concat bugs.
+ */
+const API_ORIGIN = new URL(
+  Bun.env.API_ORIGIN ?? "http://localhost:3100"  // fallback for local dev
+);
 
-  },
+serve({
+  /**
+   * A single handler lets us do fine-grained routing ourselves.
+   * Bun will stream responses automatically; no manual piping needed.
+   */
+  async fetch(req) {
+    const { pathname, search } = new URL(req.url);
 
-  development: process.env.NODE_ENV !== "production" && {
-    // Enable browser hot reloading in development
-    hmr: true,
+    // ---------- 1. Proxy all /api/* traffic ----------
+    if (pathname.startsWith("/api")) {
+      // Strip the /api prefix before forwarding, e.g. /api/users → /users
+      const upstreamPath = pathname.replace(/^\/api/, "");
+      const target = new URL(upstreamPath + search, API_ORIGIN);
 
-    // Echo console logs from the browser to the server
-    console: true,
-  },
-  async fetch(req: Request): Promise<Response> {
-    const url = new URL(req.url);
-
-    console.log(url)
-
-    // Proxy anything under /api/ to your local Flask/Uvicorn on 5000
-    if (url.pathname.startsWith("/api/")) {
-      // rebuild a new target URL:
-      const target = new URL(req.url);
-      target.hostname = "127.0.0.1";
-      target.port = "5000";
-      console.log(target)
-
-      return fetch(target.toString(), {
+      // Forward the request verbatim—method, body, headers, etc.
+      // You can filter or rewrite headers here if necessary.
+      const upstreamResp = await fetch(target, {
         method: req.method,
         headers: req.headers,
-        // body can be null for GET/HEAD
-        body: ["GET","HEAD"].includes(req.method) ? null : req.body,
+        body:
+          req.method === "GET" || req.method === "HEAD"
+            ? undefined
+            : req.body,
+        // Keep streaming semantics (important for large uploads/downloads)
+        duplex: "half",
+      });
+
+      // Mirror the upstream status, headers, and body.
+      return new Response(upstreamResp.body, {
+        status: upstreamResp.status,
+        statusText: upstreamResp.statusText,
+        headers: upstreamResp.headers,
       });
     }
 
-    // Otherwise serve your SPA entrypoint
+    // ---------- 2. Serve client SPA for everything else ----------
     return new Response(index, {
-      headers: { "Content-Type": "text/html" },
+      headers: { "Content-Type": "text/html; charset=utf-8" },
     });
   },
+
+  // ---------- 3. Dev niceties ----------
+  development:
+    process.env.NODE_ENV !== "production" && {
+      hmr: true,
+      console: true,
+    },
 });
 
-console.log(`🚀 Server running at ${server.url}`);
+console.log(`🚀  Bun server is live on ${process.env.BUN_SERVER_URL ?? "default port"}`);
+
