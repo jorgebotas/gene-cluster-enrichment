@@ -21,6 +21,7 @@ import cytoscape, {
   NodeSingular,
 } from 'cytoscape';
 import cise from 'cytoscape-cise';
+import fcose from 'cytoscape-fcose';
 import layoutUtilities from 'cytoscape-layout-utilities';
 import cytoscapePopper from 'cytoscape-popper';
 import svg from 'cytoscape-svg';
@@ -96,10 +97,10 @@ const DEFAULT_LAYOUT: CiseLayoutOptions = {
   animate: false,
   refresh: 10,
   padding: 10,
-  nodeSeparation: 5,
+  nodeSeparation: 10,
   packComponents: true,
   allowNodesInsideCircle: false,
-  maxRatioOfNodesInsideCircle: 0.3,
+  maxRatioOfNodesInsideCircle: 1,
 };
 
 const DEFAULT_LAYOUT_UTILITIES = {
@@ -226,8 +227,9 @@ const ClusterGraph = forwardRef<ClusterGraphHandle, ClusterGraphProps>((props, r
   } = props;
 
   // ---- cytoscape setup
-  cytoscape.use(cise);
   cytoscape.use(svg);
+  cytoscape.use(cise);
+  cytoscape.use(fcose);
   cytoscape.use(layoutUtilities);
   cytoscape.use(cytoscapePopper(popperFactory));
 

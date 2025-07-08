@@ -60,6 +60,25 @@ const EFFECT_PALETTE = {
   Neutral   : '#888888',
 };
 
+function replaceRectsWithPaths(svg: SVGSVGElement) {
+  [...svg.querySelectorAll('rect')].forEach(r => {
+    const x  = +r.getAttribute('x')! || 0;
+    const y  = +r.getAttribute('y')! || 0;
+    const w  = +r.getAttribute('width')!  || 0;
+    const h  = +r.getAttribute('height')! || 0;
+
+    const p = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    p.setAttribute('d', `M${x},${y}h${w}v${h}h-${w}Z`);
+    // copy presentation attributes you care about
+    ['fill','stroke','stroke-width','opacity'].forEach(attr => {
+      const v = r.getAttribute(attr);
+      if (v) p.setAttribute(attr, v);
+    });
+    r.parentNode!.replaceChild(p, r);
+  });
+}
+
+
 /* ---------- handle + props ------------------------------------------- */
 export interface ClusterEnrichmentHandle {
   getGenes(): string[];
@@ -101,7 +120,7 @@ const ClusterEnrichment = forwardRef<ClusterEnrichmentHandle, Props>(
     const [error,   setError]   = useState<string | null>(null);
 
     /* filters come from ControlPanel */
-    const [ringKey, setRingKey] = useState<string | undefined>(undefined);
+    const [ringKey, setRingKey] = useState<string | undefined>("effect");
     const [filters, setFilters] = useState<Filters>({
       confidence : 0.4,
       edgeSources: DEFAULT_EDGE_SOURCES,
@@ -161,7 +180,7 @@ const ClusterEnrichment = forwardRef<ClusterEnrichmentHandle, Props>(
 
   async function exportFigures() {
     const graphSVG = graphRef.current?.getCy()?.svg({ full: false });
-    const barplotSVG = barplorRef.current?.getSVG?.() as SVGElement | null;
+    const barplotSVG = barplotRef.current?.getSVG?.() as SVGElement | null;
 
     if (!graphSVG || !barplotSVG) {
       alert('One of the visualizations is not available for export.');
@@ -175,6 +194,7 @@ const ClusterEnrichment = forwardRef<ClusterEnrichmentHandle, Props>(
     svgContainer1.innerHTML = graphSVG;
     const svgEl1 = svgContainer1.querySelector('svg');
 
+    replaceRectsWithPaths(barplotSVG);          // 👈 make it safe
     const svgEl2 = barplotSVG.cloneNode(true) as SVGElement;
 
     if (svgEl1 && svgEl2) {

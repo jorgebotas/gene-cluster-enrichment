@@ -13,6 +13,7 @@
         "bun-plugin-tailwind": "^0.0.14",
         "cytoscape": "^3.32.0",
         "cytoscape-cise": "^2.0.0",
+        "cytoscape-fcose": "^2.2.0",
         "cytoscape-layout-utilities": "^1.1.1",
         "cytoscape-popper": "^4.0.1",
         "cytoscape-svg": "^0.4.0",
@@ -373,6 +374,8 @@
     "cytoscape": ["cytoscape@3.32.0", "", {}, "sha512-5JHBC9n75kz5851jeklCPmZWcg3hUe6sjqJvyk3+hVqFaKcHwHgxsjeN1yLmggoUc6STbtm9/NQyabQehfjvWQ=="],
 
     "cytoscape-cise": ["cytoscape-cise@2.0.0", "", { "dependencies": { "avsdf-base": "^1.0.0", "cose-base": "^2.2.0" }, "peerDependencies": { "cytoscape": "^3.2.0" } }, "sha512-LDhoJk1Iuruyhd/jVqwnXGm9X5nD5DMlonSjwLKem/3o/zE3BRyUonBsydekWK7XzxBVytRNc5BIniGWxyMc3g=="],
+
+    "cytoscape-fcose": ["cytoscape-fcose@2.2.0", "", { "dependencies": { "cose-base": "^2.2.0" }, "peerDependencies": { "cytoscape": "^3.2.0" } }, "sha512-ki1/VuRIHFCzxWNrsshHYPs6L7TvLu3DL+TyIGEsRcvVERmxokbf5Gdk7mFxZnTdiGtnA4cfSmjZJMviqSuZrQ=="],
 
     "cytoscape-layout-utilities": ["cytoscape-layout-utilities@1.1.1", "", { "dependencies": { "@babel/runtime": "^7.12.5", "@turf/turf": "^5.1.6", "@types/d3-delaunay": "^5.3.0", "convex-minkowski-sum": "^1.0.0", "d3-delaunay": "^5.3.0" }, "peerDependencies": { "cytoscape": "^3.2.0" } }, "sha512-JnTAVGMsNtYjmUiDvFYKN/5MHkHOrEvuK9rOt7bhYvSfUrOFziTdrZM/8B2tSQ9iwcMEX3nzNiZjUoYIJxWb4w=="],
 
