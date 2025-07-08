@@ -1,83 +1,99 @@
-// EnrichmentBarplot.tsx — with imperative handle
+// EnrichmentBarplot.tsx — SVG-quality output with visx tooltip
 // ---------------------------------------------------------------------------
-// Adds a ref API so parent can:
-//   • highlight all bars for a cluster   → highlightCluster(cid)
-//   • highlight bars containing a gene   → highlightGene(geneId)
-// Pathway rows now accept `genes: string[]`.
-// ---------------------------------------------------------------------------
+//  • Imperative API: highlightCluster(cid), highlightGene(gid), exportAsSVG()
+//  • Responsive container via @visx/responsive
+//  • Proper cluster-based ordering and coloring
+//  • Duplicate pathway labels allowed
+//  • Tooltip on hover showing full pathway metadata
 
 import React, {
-  useState,
-  useMemo,
   forwardRef,
   useImperativeHandle,
+  useRef,
+  useState,
+  useMemo,
+  MouseEvent,
 } from 'react';
-
+import { Group } from '@visx/group';
+import { AxisLeft, AxisTop, AxisBottom } from '@visx/axis';
+import { scaleLinear, scaleBand } from '@visx/scale';
+import { ParentSize } from '@visx/responsive';
+import { localPoint } from '@visx/event';
 import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  ResponsiveContainer,
-  Tooltip,
-  Cell,
-  ReferenceLine,
-} from 'recharts';
+  useTooltip,
+  TooltipWithBounds,
+  defaultStyles as tooltipDefault,
+} from '@visx/tooltip';
 
-/* ------------------------- types ---------------------------------------- */
 export interface Pathway {
-  cluster: number;      // cluster id
-  pathway: string;      // pathway name (can repeat across clusters)
-  pathwayId: string;    // pathway identifier
-  source: string;       // e.g. KEGG / Reactome
-  fdr: number;          // raw FDR (0–1)
-  genes: string[];      // genes contributing to enrichment
+  cluster: number;
+  pathway: string;
+  pathwayId: string;
+  source: string;
+  fdr: number;
+  genes: string[];
 }
 
 interface Props {
   data: Pathway[];
   palette: Record<number, string>;
-  onBarHover?: (pathway: Pathway | null) => void;
+  onBarHover?: (p: Pathway | null) => void;
   fdrThreshold?: number;
 }
 
 export interface EnrichmentBarplotHandle {
   highlightCluster(cid: number | null): void;
-  highlightGene(geneId: string | null): void;
+  highlightGene(gid: string | null): void;
+  exportAsSVG(): void;
 }
 
-/* ------------------------- helpers -------------------------------------- */
-const toLog10 = (f: number) => -Math.log10(f);
-const tickFmt = (n: number) => n.toFixed(1);
 const MAX_LABEL = 50;
 const truncate = (s: string) =>
   s.length > MAX_LABEL ? s.slice(0, MAX_LABEL - 1) + '…' : s;
 
-/* ------------------------- component ------------------------------------ */
+const toLog10 = (f: number) => -Math.log10(f);
+
+const BAR_HEIGHT = 15;
+
+const MARGIN = { top: 40, right: 20, bottom: 40, left: 270 };
+
+// ---------------------------------------------------------------------------
+// Component
+// ---------------------------------------------------------------------------
+
 const EnrichmentBarplot = forwardRef<EnrichmentBarplotHandle, Props>(
-  (
-    {
-      data,
-      palette,
-      onBarHover,
-      fdrThreshold = 0.05,
-    },
-    ref,
-  ) => {
+  ({ data, palette, onBarHover, fdrThreshold = 0.05 }, ref) => {
+    const svgRef = useRef<SVGSVGElement | null>(null);
     const [hoverCid, setHoverCid] = useState<number | null>(null);
     const [activeCid, setActiveCid] = useState<number | null>(null);
     const [activeGene, setActiveGene] = useState<string | null>(null);
 
-    /* build rows – one per cluster/pathway */
-    const rows = useMemo(() => {
-      return data.map((d) => ({
-        id: `${d.cluster}|${d.pathwayId}`,
-        ...d,
-        logFdr: toLog10(d.fdr),
-      }));
-    }, [data]);
+    // --- Tooltip -----------------------------------------------------------
+    const {
+      tooltipOpen,
+      tooltipData,
+      tooltipLeft,
+      tooltipTop,
+      showTooltip,
+      hideTooltip,
+    } = useTooltip<Pathway>();
 
-    /* imperative API */
+    // --- Derived data ------------------------------------------------------
+    const rows = useMemo(
+      () =>
+        data
+          .map(d => ({
+            id: `${d.cluster}|${d.pathwayId}`,
+            ...d,
+            logFdr: toLog10(d.fdr),
+          }))
+          .sort((a, b) => a.cluster - b.cluster),
+      [data],
+    );
+
+    const height = rows.length * BAR_HEIGHT + MARGIN.top + MARGIN.bottom;
+
+    // --- Imperative handle -------------------------------------------------
     useImperativeHandle(ref, () => ({
       highlightCluster(cid) {
         setActiveGene(null);
@@ -87,121 +103,175 @@ const EnrichmentBarplot = forwardRef<EnrichmentBarplotHandle, Props>(
         setActiveCid(null);
         setActiveGene(g);
       },
+      exportAsSVG() {
+        if (!svgRef.current) return;
+        const svgString = new XMLSerializer().serializeToString(svgRef.current);
+        const blob = new Blob([svgString], { type: 'image/svg+xml' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'enrichment.svg';
+        a.click();
+        URL.revokeObjectURL(url);
+      },
     }));
 
-    /* y‑axis tick renderer */
-    const yTick = (props: any) => {
-      const { x, y, payload } = props;
-      const short = truncate(payload.value as string);
-      return (
-        <text
-          x={x}
-          y={y}
-          dy={4}
-          textAnchor="end"
-          fill="#333"
-          fontSize={12}
-          pointerEvents="none"
-        >
-          {short}
-          <title>{payload.value}</title>
-        </text>
-      );
-    };
-
-    /* tooltip */
-    const tip = ({ active, payload }: any) => {
-      if (!active || !payload?.length) return null;
-      const r = payload[0].payload;
-      return (
-        <div className="rounded border bg-white p-2 text-xs space-y-1">
-          <div className="font-semibold max-w-[240px]">
-            {r.pathway}
-          </div>
-          <div>ID: {r.pathwayId}</div>
-          <div>Source: {r.source}</div>
-          {/* <div>Genes: {r.genes.join(', ')}</div> */}
-          <div className="flex items-center gap-1">
-            <span
-              className="inline-block w-3 h-3 rounded"
-              style={{ background: palette[r.cluster] }}
-            />
-            Cluster {r.cluster}
-          </div>
-          <div>FDR ≈ {r.fdr.toExponential(2)}</div>
-          <div>-log₁₀(FDR): {r.logFdr.toFixed(2)}</div>
-        </div>
-      );
-    };
-
-    /* decide stroke */
-    const strokeFor = (row: typeof rows[number]) => {
-      const cMatch = activeCid !== null && row.cluster === activeCid;
-      const gMatch = activeGene !== null && row.genes.includes(activeGene);
-      const hMatch = row.cluster === hoverCid;
-      return cMatch || gMatch || hMatch ? '#000' : 'none';
-    };
-
-    const minHeight = Math.max(50, rows.length * 15);
-
+    // ----------------------------------------------------------------------
     return (
-      <ResponsiveContainer 
-            width="100%" 
-            height="100%" 
-            // minHeight={minHeight}
-            style={{ overflowY: "auto"}}>
-        <BarChart
-          data={rows}
-          layout="vertical"
-          barCategoryGap={2}
-          margin={{ left: 240, right: 32, top: 16, bottom: 16 }}
-        >
-          <XAxis
-            type="number"
-            tickFormatter={tickFmt}
-            domain={[0, 'dataMax + 0.5']}
-            label={{ value: '-log10(FDR)', position: 'insideBottom', dy: 12 }}
-          />
+      <div className="w-full h-full overflow-y-auto relative">
+        <ParentSize>
+          {({ width }) => {
+            const yScale = scaleBand({
+              domain: rows.map(d => d.id),
+              range: [MARGIN.top, height - MARGIN.bottom],
+              padding: 0.15,
+            });
 
-          <YAxis
-            dataKey="pathway"
-            type="category"
-            width={100}
-            interval={0}
-            tickLine={false}
-            axisLine={false}
-            allowDuplicatedCategory
-            tick={yTick}
-          />
+            const xScale = scaleLinear<number>({
+              domain: [0, Math.max(...rows.map(d => d.logFdr)) + 0.5],
+              range: [MARGIN.left, width - MARGIN.right],
+            });
 
-          <Tooltip wrapperStyle={{ zIndex: 1000 }} content={tip} />
+            // ------------------------------------------ render SVG
+            return (
+              <>
+                <svg ref={svgRef} width={width} height={height}>
+                  <Group>
+                    <AxisTop
+                      top={MARGIN.top}
+                      scale={xScale}
+                      numTicks={5}
+                      tickFormat={v => v.toFixed(1)}
+                      label="-log₁₀(FDR)"
+                    />
+                    <AxisBottom
+                      top={height - MARGIN.bottom}
+                      scale={xScale}
+                      numTicks={5}
+                      tickFormat={v => v.toFixed(1)}
+                      label="-log₁₀(FDR)"
+                    />
+                    <AxisLeft
+                      left={MARGIN.left - 2}
+                      scale={yScale}
+                      numTicks={rows.length}
+                      tickFormat={id => truncate(rows.find(r => r.id === id)?.pathway ?? '')}
+                    />
 
-          <Bar dataKey="logFdr" isAnimationActive={false}>
-            {rows.map((r) => (
-              <Cell
-                key={r.id}
-                fill={palette[r.cluster] ?? '#999'}
-                stroke={strokeFor(r)}
-                strokeWidth={strokeFor(r) !== 'none' ? 2 : 1}
-                onMouseEnter={() => {
-                  setHoverCid(r.cluster);
-                  onBarHover?.({cluster: r.cluster, genes: r.genes});
-                }}
-                onMouseLeave={() => {
-                  setHoverCid(null);
-                  onBarHover?.(null);
-                }}
-              />
-            ))}
-          </Bar>
+                    {/* Bars */}
+                    {rows.map(r => {
+                      const y = yScale(r.id);
+                      if (y === undefined) return null;
 
-          <ReferenceLine
-            x={toLog10(fdrThreshold)}
-            strokeDasharray="3 3"
-            stroke="grey"
-          />
-        </BarChart>
-      </ResponsiveContainer>
+                      const highlightByCluster = activeCid !== null && r.cluster === activeCid;
+                      const highlightByGene =
+                        activeGene !== null && r.genes.includes(activeGene);
+                      const highlightByHover = r.cluster === hoverCid;
+
+                      const stroke =
+                        highlightByCluster || highlightByGene || highlightByHover
+                          ? '#000'
+                          : 'none';
+
+                      /** Mouse move/enter handler */
+                      const handleMove = (evt: MouseEvent<SVGRectElement>) => {
+                        const coords = localPoint(evt);
+                        if (!coords) return;
+                        showTooltip({
+                          tooltipLeft: coords.x + 10, // small offset
+                          tooltipTop: coords.y,
+                          tooltipData: r,
+                        });
+                      };
+
+                      return (
+                        <Group key={r.id}>
+                          <rect
+                            x={xScale(0)}
+                            y={y}
+                            height={yScale.bandwidth()}
+                            width={xScale(r.logFdr) - xScale(0)}
+                            fill={palette[r.cluster] ?? '#ccc'}
+                            stroke={stroke}
+                            strokeWidth={stroke !== 'none' ? 2 : 1}
+                            onMouseEnter={evt => {
+                              setHoverCid(r.cluster);
+                              onBarHover?.(r);
+                              handleMove(evt);
+                            }}
+                            onMouseMove={handleMove}
+                            onMouseLeave={() => {
+                              setHoverCid(null);
+                              hideTooltip();
+                              onBarHover?.(null);
+                            }}
+                          />
+                        </Group>
+                      );
+                    })}
+
+                    {/* Threshold line */}
+                    <line
+                      x1={xScale(toLog10(fdrThreshold))}
+                      x2={xScale(toLog10(fdrThreshold))}
+                      y1={MARGIN.top}
+                      y2={height - MARGIN.bottom}
+                      stroke="grey"
+                      strokeWidth={2}
+                      strokeDasharray="3 3"
+                    />
+                  </Group>
+                </svg>
+
+                {/* Tooltip overlay */}
+                {tooltipOpen && tooltipData && (
+                  <TooltipWithBounds
+                    top={tooltipTop}
+                    left={tooltipLeft}
+                    style={{
+                      ...tooltipDefault,
+                      backgroundColor: '#fff',
+                      color: '#000',
+                      border: '1px solid #666',
+                      borderRadius: 4,
+                      padding: '6px 8px',
+                      maxWidth: 260,
+                      fontSize: 12,
+                      boxShadow: '0 1px 4px rgba(0,0,0,0.3)',
+                      pointerEvents: 'none',
+                    }}
+                  >
+                    <div style={{ fontWeight: 600 }}>
+                      {tooltipData.pathway}
+                    </div>
+                    <div style={{ marginTop: 4 }}>
+                      <div>ID: {tooltipData.pathwayId}</div>
+                      <div>Source: {tooltipData.source}</div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                        <span
+                          style={{
+                            width: 10,
+                            height: 10,
+                            background: palette[tooltipData.cluster] ?? '#ccc',
+                            borderRadius: 2,
+                          }}
+                        />
+                        Cluster {tooltipData.cluster}
+                      </div>
+                      <div>
+                        FDR ≈ {tooltipData.fdr.toExponential(2)}
+                      </div>
+                      <div>
+                        -log<sub>10</sub>(FDR): {tooltipData.logFdr.toFixed(2)}
+                      </div>
+                    </div>
+                  </TooltipWithBounds>
+                )}
+              </>
+            );
+          }}
+        </ParentSize>
+      </div>
     );
   },
 );

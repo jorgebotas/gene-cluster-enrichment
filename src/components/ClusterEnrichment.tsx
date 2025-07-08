@@ -11,6 +11,9 @@ import EnrichmentBarplot, {
   Pathway, EnrichmentBarplotHandle,
 } from '@/components/EnrichmentBarplot';
 import type { ElementDefinition } from 'cytoscape';
+import { saveAs } from 'file-saver';
+import { jsPDF } from 'jspdf';
+import { svg2pdf } from 'svg2pdf.js';
 
 /* ---------- fetch helper (POST) -------------------------------------- */
 type Filters = {
@@ -156,6 +159,36 @@ const ClusterEnrichment = forwardRef<ClusterEnrichmentHandle, Props>(
       [rows],
     );
 
+  async function exportFigures() {
+    const graphSVG = graphRef.current?.getCy()?.svg({ full: false });
+    const barplotSVG = document.querySelector(
+      'svg.recharts-surface'
+    ) as SVGElement | null;
+
+    if (!graphSVG || !barplotSVG) {
+      alert('One of the visualizations is not available for export.');
+      return;
+    }
+
+    // Combine into PDF
+    const pdf = new jsPDF({ orientation: 'landscape', unit: 'pt' });
+
+    const svgContainer1 = document.createElement('div');
+    svgContainer1.innerHTML = graphSVG;
+    const svgEl1 = svgContainer1.querySelector('svg');
+
+    const svgEl2 = barplotSVG.cloneNode(true) as SVGElement;
+
+    if (svgEl1 && svgEl2) {
+      await svg2pdf(svgEl1, pdf, {  yOffset: 20 });
+      pdf.addPage();
+      await svg2pdf(svgEl2, pdf, { xOffset: 20, yOffset: 20 });
+      pdf.save('gene-cluster-enrichment.pdf');
+    }
+  }
+
+
+
     if (error)   return <div className="p-4 text-red-600">{error}</div>;
 
     /* ------------------- render ------------------------------------ */
@@ -166,6 +199,7 @@ const ClusterEnrichment = forwardRef<ClusterEnrichmentHandle, Props>(
           activeRing={ringKey}
           activeEdgeSources={filters.edgeSources}
           onFiltersChange={updateFilters}
+          onExportFigures={exportFigures}
           onActiveRingChange={(value) => {
             graphRef.current?.drawRing(
               value === 'none' ? { key: undefined } : { key: value },
@@ -178,35 +212,36 @@ const ClusterEnrichment = forwardRef<ClusterEnrichmentHandle, Props>(
             <div className="p-4 text-gray-500">Loading data...</div>
         )}
         {!loading && (
-        <DynamicContainer>
-          <ClusterGraph
-            ref={graphRef}
-            nodes={rows}
-            edges={edges}
-            palette={palette}
-            sourcePalette={ANALYSIS_PALETTE}
-            effectPalette={EFFECT_PALETTE}
-            ringKey={ringKey}
-            nodeDetailsEndpoint={nodeDetailsEndpoint}
-            /* hover → highlight */
-            onNodeMouseEnter={(id) => barplotRef.current?.highlightGene(id)}
-            onNodeMouseLeave={()   => barplotRef.current?.highlightGene(null)}
-            onNodesSelect={onGenesSelect}
-          />
+          <div className="flex-grow flex overflow-hidden">
+            <DynamicContainer>
+              <ClusterGraph
+                ref={graphRef}
+                nodes={rows}
+                edges={edges}
+                palette={palette}
+                sourcePalette={ANALYSIS_PALETTE}
+                effectPalette={EFFECT_PALETTE}
+                ringKey={ringKey}
+                nodeDetailsEndpoint={nodeDetailsEndpoint}
+                /* hover → highlight */
+                onNodeMouseEnter={(id) => barplotRef.current?.highlightGene(id)}
+                onNodeMouseLeave={()   => barplotRef.current?.highlightGene(null)}
+                onNodesSelect={onGenesSelect}
+              />
 
-          <EnrichmentBarplot
-            ref={barplotRef}
-            data={enrich}
-            palette={palette}
-            onBarHover={(p) => {
-              const g = graphRef.current;
-              if (!g) return;
-              g.highlightCluster(p?.cluster ?? null);
-              g.selectNodes(p?.genes ?? []);
-            }}
-          />
-        </DynamicContainer>
-
+              <EnrichmentBarplot
+                ref={barplotRef}
+                data={enrich}
+                palette={palette}
+                onBarHover={(p) => {
+                  const g = graphRef.current;
+                  if (!g) return;
+                  g.highlightCluster(p?.cluster ?? null);
+                  g.selectNodes(p?.genes ?? []);
+                }}
+              />
+            </DynamicContainer>
+          </div>
         )}
 
       </div>

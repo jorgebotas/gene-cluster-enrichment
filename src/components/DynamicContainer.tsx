@@ -5,7 +5,6 @@ import Split from "react-split";
  * A thin wrapper around `react-split` with a minimal swap‑mechanism.
  *
  * – Drag the gutter to resize.
- * – Double‑click a gutter to swap the two neighbouring panes.
  * – Accepts 2‑n children.
  */
 interface DynamicContainerProps {
@@ -22,15 +21,6 @@ const DynamicContainer: React.FC<DynamicContainerProps> = ({
 }) => {
   const [order, setOrder] = useState(children.map((_, i) => i));
 
-  // Helper to swap panes on double‑click
-  const handleGutterDblClick = (idx: number) => {
-    setOrder((prev) => {
-      const next = [...prev];
-      [next[idx], next[idx + 1]] = [next[idx + 1], next[idx]];
-      return next;
-    });
-  };
-
   return (
     <Split
       className={`${
@@ -45,7 +35,6 @@ const DynamicContainer: React.FC<DynamicContainerProps> = ({
         const g = document.createElement("div");
         g.className =
           "bg-gray-300 hover:bg-gray-400 transition-colors duration-150";
-        g.addEventListener("dblclick", () => handleGutterDblClick(idx));
         return g;
       }}
     >

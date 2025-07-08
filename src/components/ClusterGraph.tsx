@@ -23,6 +23,7 @@ import cytoscape, {
 import cise from 'cytoscape-cise';
 import layoutUtilities from 'cytoscape-layout-utilities';
 import cytoscapePopper from 'cytoscape-popper';
+import svg from 'cytoscape-svg';
 import { computePosition, flip, shift, limitShift } from '@floating-ui/dom';
 
 // ---------------------------------------------------------------------------
@@ -36,6 +37,7 @@ export interface ClusterGraphHandle {
   setPalette: (p: Record<number, string>) => void;
   drawRing: ({key, palette}: {key?: string, palette?: Record<string, string>}) => void;
   getCy: () => Core | null;
+  getCounts: () => Record<string, number>,
   rebuildGraph: () => void;
 }
 
@@ -225,6 +227,7 @@ const ClusterGraph = forwardRef<ClusterGraphHandle, ClusterGraphProps>((props, r
 
   // ---- cytoscape setup
   cytoscape.use(cise);
+  cytoscape.use(svg);
   cytoscape.use(layoutUtilities);
   cytoscape.use(cytoscapePopper(popperFactory));
 
@@ -247,6 +250,7 @@ const ClusterGraph = forwardRef<ClusterGraphHandle, ClusterGraphProps>((props, r
     "source": sourcePalette ?? {},
     "effect": effectPalette ?? {},
   });
+  const [counts, setCounts] = useState<Record<string, number>>({})
 
   // Internal event handlers
   async function onNodeTap({event, cy}: {event: EventObject, cy: Core}) {
@@ -487,6 +491,12 @@ const ClusterGraph = forwardRef<ClusterGraphHandle, ClusterGraphProps>((props, r
 
     cy.edges().unselectify();
 
+    setCounts({
+      nodes: graphRef.current.nodes.length, 
+      edges: graphRef.current.edges.length, 
+      clusters: graphRef.current.clusters.length
+    });
+
     /* ───────────────────────── fit on resize ────────────────────────── */
     const detachFit = attachFitOnResize(cy, containerRef.current!);
     
@@ -551,6 +561,15 @@ const ClusterGraph = forwardRef<ClusterGraphHandle, ClusterGraphProps>((props, r
     getCy() {
       return cyRef.current;
     },
+    getCounts() {
+      const graph = graphRef.current;
+      if (!graph) return {};
+      return {
+        nodes: graph.nodes.length,
+        edges: graph.edges.length,
+        clusters: graph.clusters.length
+      }
+    },
     rebuildGraph() {
       // clean previous instance
       detachFitRef.current?.();
@@ -588,7 +607,18 @@ const ClusterGraph = forwardRef<ClusterGraphHandle, ClusterGraphProps>((props, r
     };
   }, []);
 
-  return <div ref={containerRef} className="w-full h-full" />;
+  return (
+    <div className="relative w-full h-full">
+    {counts.nodes && (
+      <div className="absolute top-0 left-10 text-xs ">
+      <span className="mr-1">{counts.nodes} nodes,</span>
+      <span className="mr-1">{counts.edges} edges,</span> 
+     <span className="mr-1"> {counts.clusters} clusters</span>
+      </div>)
+    }
+    <div ref={containerRef} className="w-full h-full"/>
+    </div>
+  );
 });
 
 ClusterGraph.displayName = 'ClusterGraph';

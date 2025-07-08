@@ -7,7 +7,7 @@
    • Analysis pills remain
 */
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import type { ClusterGraphHandle } from '@/components/ClusterGraph';
 
 
@@ -22,18 +22,19 @@ interface Props {
     analyses: string[];
   }) => void;
   onActiveRingChange?: (ring: string) => void;
+  onExportFigures?: () => void;
 }
 
 /* default ring menu */
-const ANALYSES = [
-  'Aβ42',
-  'Tau',
-  'αSyn',
-];
-const EFFECTS = [
-  "Suppressor",
-  "Driver",
-];
+const ANALYSIS_PALETTE = {
+  Aβ42: '#619878',
+  Tau : '#8e8ec1',
+  αSyn: '#eeaa58',
+};
+const EFFECT_PALETTE = {
+  Suppressor: '#587ead',
+  Driver    : '#ad5d58',
+};
 const RING_OPTIONS = [
   { label: 'Analysis', value: 'source' },
   { label: 'Effect', value: 'effect' },
@@ -62,16 +63,21 @@ export default function ControlPanel({
   activeEdgeSources,
   onFiltersChange,
   onActiveRingChange,
+  onExportFigures,
 }: Props) {
   /* local UI state */
-  const [ringKey,  setRingKey]  = React.useState(activeRing || "none");
-  const [conf,     setConf]     = React.useState(0.4); // committed value
-  const [tempConf, setTemp]     = React.useState(0.4); // slider position
-  const [sources,  setSources]  = React.useState<Set<string>>(new Set(
+  const [ringKey,  setRingKey]  = useState(activeRing || "none");
+  const [conf,     setConf]     = useState(0.4); // committed value
+  const [tempConf, setTemp]     = useState(0.4); // slider position
+  const [sources,  setSources]  = useState<Set<string>>(new Set(
     activeEdgeSources || EDGE_SOURCES.map((s) => s.value),
   ));
-  const [analyses, setAnalyses] = React.useState<Set<string>>(new Set(ANALYSES));
-  const [effects,  setEffects]  = React.useState<Set<string>>(new Set(EFFECTS));
+  const [analyses, setAnalyses] = useState<Set<string>>(new Set(
+    Object.keys(ANALYSIS_PALETTE)
+  ));
+  const [effects,  setEffects]  = useState<Set<string>>(new Set(
+    Object.keys(EFFECT_PALETTE)
+  ));
 
   /* helpers */
   const toggle =
@@ -104,6 +110,10 @@ export default function ControlPanel({
               onClick={() => graphRef.current?.rebuildGraph()}>
         Reset View
       </button>
+      <button className={btn}
+              onClick={() => onExportFigures()}>
+        Export
+      </button>
       {/* <button className={btn}
               onClick={() => graphRef.current?.getCy()?.fit()}>
         Fit
@@ -112,30 +122,34 @@ export default function ControlPanel({
       {/* analysis pills */}
       <div className="flex items-center gap-1">
         <label className="text-sm font-medium pr-3">Analysis:</label>
-        {ANALYSES.map((a) => (
+
+        {Object.entries(ANALYSIS_PALETTE).map(([a, color]) => (
           <span
             key={a}
             onClick={() => toggle(setAnalyses, a)}
             className={`${pill}
-              ${analyses.has(a)
-                ? 'bg-indigo-500 text-white hover:bg-indigo-600'
-                : 'bg-gray-200 hover:bg-gray-300'}`}
+              ${analyses.has(a) ? 'text-white' : 'bg-gray-200 hover:bg-gray-300'}`}
+            style={{
+              backgroundColor: analyses.has(a) && color
+            }}
           >
             {a}
           </span>
         ))}
+
       </div>
 
       <div className="flex items-center gap-1">
         <label className="text-sm font-medium pr-3">Effect:</label>
-        {Array.from(EFFECTS).map((e) => (
+        {Object.entries(EFFECT_PALETTE).map(([e, color]) => (
           <span
             key={e}
             onClick={() => toggle(setEffects, e)}
             className={`${pill}
-              ${effects.has(e)
-                ? 'bg-indigo-500 text-white hover:bg-indigo-600'
-                : 'bg-gray-200 hover:bg-gray-300'}`}
+              ${effects.has(e) ? 'text-white' : 'bg-gray-200 hover:bg-gray-300'}`}
+            style={{
+              backgroundColor: effects.has(e) && color
+            }}
           >
             {e}
           </span>
