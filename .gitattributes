@@ -1,0 +1,8 @@
+data/diopt.celltype-modifiers.csv filter=lfs diff=lfs merge=lfs -text
+data/experimental-modifiers.tsv filter=lfs diff=lfs merge=lfs -text
+data/modifier-data.json filter=lfs diff=lfs merge=lfs -text
+data/top_enrichment.csv filter=lfs diff=lfs merge=lfs -text
+data/7227.protein.enrichment.terms.v12.0.txt filter=lfs diff=lfs merge=lfs -text
+data/7227.protein.info.v12.0.txt filter=lfs diff=lfs merge=lfs -text
+data/celltype-modifiers.csv filter=lfs diff=lfs merge=lfs -text
+data/** filter=lfs diff=lfs merge=lfs -text
