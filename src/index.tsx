@@ -18,6 +18,8 @@ const server = serve({
   async fetch(req: Request): Promise<Response> {
     const url = new URL(req.url);
 
+    console.log(url)
+
     // Proxy anything under /api/ to your local Flask/Uvicorn on 5000
     if (url.pathname.startsWith("/api/")) {
       // rebuild a new target URL:
