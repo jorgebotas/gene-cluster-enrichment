@@ -8,6 +8,8 @@ import GeneTable, {
 import DynamicContainer from "./components/DynamicContainer";
 import "./index.css";
 
+const API = "http://slytherin.nri.bcm.edu/api"
+
 // ✅ Drop the hero header for now; focus on the workspace
 export function App() {
   const clusterEnrichmentRef = useRef<ClusterEnrichmentHandle>(null);
@@ -29,9 +31,9 @@ export function App() {
       <div className="h-full w-screen">
         <ClusterEnrichment
             ref={clusterEnrichmentRef}
-            dataEndpoint="http://127.0.0.1:5000/api/graph-data"
+            dataEndpoint=`${API}/graph-data`
             nodeDetailsEndpoint={(nodeId: string) =>
-              `http://127.0.0.1:5000/api/node-details/${nodeId}`
+              `${API}/node-details/${nodeId}`
             }
             onGenesSelect={(ids: string[]) => {
               geneTableRef.current?.selectGenes(ids);
@@ -41,7 +43,7 @@ export function App() {
       <div className="h-full w-screen">
         <GeneTable
             ref={geneTableRef}
-            endpoint="http://127.0.0.1:5000/api/gene-table"
+            endpoint=`${API}/gene-table`
             palettes={palettes}
             onGenesSelect={(ids: string[]) => {
               clusterEnrichmentRef.current?.selectGenes(ids);
