@@ -24,6 +24,7 @@ const server = serve({
       const target = new URL(req.url);
       target.hostname = "127.0.0.1";
       target.port = "5000";
+      console.log(target)
 
       return fetch(target.toString(), {
         method: req.method,
