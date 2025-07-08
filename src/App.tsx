@@ -38,7 +38,7 @@ export function App() {
             }}
         />
       </div>
-      <div className="h-full w-screen p-4">
+      <div className="h-full w-screen">
         <GeneTable
             ref={geneTableRef}
             endpoint="http://127.0.0.1:5000/api/gene-table"
