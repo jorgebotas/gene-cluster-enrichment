@@ -31,7 +31,7 @@ export function App() {
       <div className="h-full w-screen">
         <ClusterEnrichment
             ref={clusterEnrichmentRef}
-            dataEndpoint=`${API}/graph-data`
+            dataEndpoint={`${API}/graph-data`}
             nodeDetailsEndpoint={(nodeId: string) =>
               `${API}/node-details/${nodeId}`
             }
@@ -43,7 +43,7 @@ export function App() {
       <div className="h-full w-screen">
         <GeneTable
             ref={geneTableRef}
-            endpoint=`${API}/gene-table`
+            endpoint={`${API}/gene-table`}
             palettes={palettes}
             onGenesSelect={(ids: string[]) => {
               clusterEnrichmentRef.current?.selectGenes(ids);
