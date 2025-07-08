@@ -21,7 +21,6 @@ import cytoscape, {
   NodeSingular,
 } from 'cytoscape';
 import cise from 'cytoscape-cise';
-import fcose from 'cytoscape-fcose';
 import layoutUtilities from 'cytoscape-layout-utilities';
 import cytoscapePopper from 'cytoscape-popper';
 import svg from 'cytoscape-svg';
@@ -229,7 +228,6 @@ const ClusterGraph = forwardRef<ClusterGraphHandle, ClusterGraphProps>((props, r
   // ---- cytoscape setup
   cytoscape.use(svg);
   cytoscape.use(cise);
-  cytoscape.use(fcose);
   cytoscape.use(layoutUtilities);
   cytoscape.use(cytoscapePopper(popperFactory));
 
