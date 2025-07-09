@@ -15,6 +15,7 @@ import type { ClusterGraphHandle } from '@/components/ClusterGraph';
 interface Props {
   graphRef: React.RefObject<ClusterGraphHandle>;
   activeRing?: string;
+  activeStatistic?: string;
   activeEdgeSources?: string[];
   onFiltersChange?: (p: {
     confidence: number;
@@ -40,6 +41,10 @@ const RING_OPTIONS = [
   { label: 'Effect', value: 'effect' },
   { label: 'None',   value: 'none'   },
 ];
+const STATISTIC_OPTIONS = [
+  { label: 'Grouped', value: 'grouped' },
+  { label: 'Per Cell Type', value: 'celltype' },
+];
 const EDGE_SOURCES = [
     {label: "Neighborhood", value: 'neighborhood'},
     {label: "Fusion", value: 'fusion'},
@@ -60,6 +65,7 @@ const pill  = 'px-3 py-1 rounded text-sm transition cursor-pointer';
 export default function ControlPanel({
   graphRef,
   activeRing,
+  activeStatistic,
   activeEdgeSources,
   onFiltersChange,
   onActiveRingChange,
@@ -67,6 +73,7 @@ export default function ControlPanel({
 }: Props) {
   /* local UI state */
   const [ringKey,  setRingKey]  = useState(activeRing || "none");
+  const [statistic, setStatistic]  = useState(activeStatistic || "celltype");
   const [conf,     setConf]     = useState(0.4); // committed value
   const [tempConf, setTemp]     = useState(0.4); // slider position
   const [sources,  setSources]  = useState<Set<string>>(new Set(
@@ -92,13 +99,14 @@ export default function ControlPanel({
   useEffect(() => {
     const filters = {
       confidence: conf,
+      statistic: statistic,
       edgeSources: Array.from(sources),
       analyses: Array.from(analyses),
       effects: Array.from(effects),
     };
     console.log("calling onFiltersChange", filters);
     onFiltersChange?.(filters);
-  }, [conf, sources, analyses, effects, onFiltersChange]);
+  }, [statistic, conf, sources, analyses, effects, onFiltersChange]);
 
   /* ------------------------------------------------------------------ */
   return (
@@ -118,6 +126,22 @@ export default function ControlPanel({
               onClick={() => graphRef.current?.getCy()?.fit()}>
         Fit
       </button> */}
+
+      {/* statistics selector */}
+      <div className="inline-flex rounded-md bg-gray-200 overflow-hidden">
+        {STATISTIC_OPTIONS.map(({ label, value }) => (
+          <button
+            key={value}
+            onClick={() => setStatistic(value)}
+            className={`px-3 py-1 text-sm transition cursor-pointer 
+              ${statistic === value
+                ? 'bg-indigo-500 text-white'
+                : 'text-gray-700 hover:bg-gray-300'}`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
 
       {/* analysis pills */}
       <div className="flex items-center gap-1">
@@ -170,7 +194,7 @@ export default function ControlPanel({
               );
               onActiveRingChange?.(value);
             }}
-            className={`px-3 py-1 text-sm transition
+            className={`px-3 py-1 text-sm transition cursor pointer 
               ${ringKey === value
                 ? 'bg-indigo-500 text-white'
                 : 'text-gray-700 hover:bg-gray-300'}`}

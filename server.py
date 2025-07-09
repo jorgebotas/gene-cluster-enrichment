@@ -12,32 +12,42 @@ CORS(app)
 SPECIES = 7227
 EDGE_SOURCES = set(StringAPI.EDGE_SOURCES.keys())
 
-modifiers = pd.read_csv("data/celltype-modifiers.csv")
-modifiers = modifiers[
-    (modifiers.model.isin(["AB42", "TauWT", "aSyn"])) &
-    # (modifiers.model.isin(["AB42"])) &
-    (modifiers.pval_adj < 0.05)
-].copy()
-modifiers["effect"] = modifiers["modifier_type"]
-gene_mapping_exceptions = {
-    "Ady43A": "Adk3",
-    "TMS1": "Serinc"
+pretty_names = {
+    "AB42": "Aβ42",
+    "TauWT": "Tau",
+    "aSyn": "αSyn",
 }
-for k, v in gene_mapping_exceptions.items():
-    modifiers.loc[modifiers.gene == k, "gene"] = v
 
 gene_df = pd.read_csv(f"data/{SPECIES}.protein.info.v12.0.txt", sep="\t")
 gene_df.columns = ["string_id", "name", "length", "description"]
 gene_data = gene_df.set_index("string_id").to_dict(orient="index")
 
-modifiers["string_id"] = modifiers.gene.map(
-    gene_df.set_index("name").string_id
-)
-modifiers = modifiers[modifiers.string_id.notna()].copy()
-
 # Load mofifier summary data for gene table
 with open("data/modifier-data.json", "r") as f:
     modifier_data = json.load(f)
+
+def format_modifiers(modifiers: pd.DataFrame):
+    modifiers = modifiers[
+        (modifiers.model.isin(["AB42", "TauWT", "aSyn"])) &
+        (modifiers.pval_adj <= 0.05)
+    ].copy()
+    modifiers["disease"] = modifiers["model"].map(pretty_names)
+    modifiers["effect"] = modifiers["modifier_type"]
+    gene_mapping_exceptions = {
+        "Ady43A": "Adk3",
+        "TMS1": "Serinc"
+    }
+    for k, v in gene_mapping_exceptions.items():
+        modifiers.loc[modifiers.gene == k, "gene"] = v
+
+    modifiers["string_id"] = modifiers.gene.map(
+        gene_df.set_index("name").string_id
+    )
+    return modifiers[modifiers.string_id.notna()].copy()
+
+grouped_modifiers = format_modifiers(pd.read_csv("data/modifiers.csv"))
+celltype_modifiers = format_modifiers(pd.read_csv("data/celltype-modifiers.csv"))
+print(celltype_modifiers)
 
 
 def filter_modifiers(modifiers, analyses=None, effect=None):
@@ -51,13 +61,15 @@ def filter_modifiers(modifiers, analyses=None, effect=None):
 @app.route('/api/graph-data', methods=['POST'])
 def graph_data():
     """Return nodes / edges / enrichment with user-defined filters."""
-    cfg       = request.get_json(silent=True) or {}
-    analyses  = set(cfg.get('analyses', []))
-    effect  = set(cfg.get('effects', []))
+    cfg = request.get_json(silent=True) or {}
+    statistic = cfg.get('statistic', 'celltype')
+    analyses = set(cfg.get('analyses', []))
+    effect = set(cfg.get('effects', []))
     confidence  = float(cfg.get('confidence', 0.4))
-    include_src   = set(cfg.get('edgeSources', EDGE_SOURCES))
-    exclude_src   = EDGE_SOURCES - include_src                 # pass to STRING API
+    include_src = set(cfg.get('edgeSources', EDGE_SOURCES))
+    exclude_src = EDGE_SOURCES - include_src                 # pass to STRING API
 
+    modifiers = celltype_modifiers if statistic == "celltype" else grouped_modifiers
     df = filter_modifiers(modifiers, analyses=analyses, effect=effect)
     string = StringAPI(
         species = SPECIES,

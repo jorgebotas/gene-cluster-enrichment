@@ -18,6 +18,7 @@ import { svg2pdf } from 'svg2pdf.js';
 /* ---------- fetch helper (POST) -------------------------------------- */
 type Filters = {
   confidence: number;
+  statistic: string;
   edgeSources: string[];
   analyses: string[];
   effects: string[];
@@ -104,6 +105,7 @@ const ClusterEnrichment = forwardRef<ClusterEnrichmentHandle, Props>(
   /* filters come from ControlPanel */
   const [ringKey, setRingKey] = useState<string | undefined>("effect");
   const [filters, setFilters] = useState<Filters>({
+    statistic: "celltype",
     confidence : 0.4,
     edgeSources: DEFAULT_EDGE_SOURCES,
     analyses   : Object.keys(ANALYSIS_PALETTE),
@@ -122,6 +124,7 @@ const ClusterEnrichment = forwardRef<ClusterEnrichmentHandle, Props>(
   /* replace updateFilters */
   const updateFilters = useCallback((f: Filters) => {
   const next: Filters = {
+      statistic: f.statistic,
       confidence : f.confidence,
       edgeSources: canon(f.edgeSources),      // ② normalise
       analyses   : canon(f.analyses),         // ②
@@ -130,9 +133,10 @@ const ClusterEnrichment = forwardRef<ClusterEnrichmentHandle, Props>(
 
   setFilters((prev) =>
       prev.confidence === next.confidence &&
+      prev.statistic === next.statistic &&
       sameArr(prev.edgeSources, next.edgeSources) &&
-      sameArr(prev.analyses,    next.analyses) &&
-      sameArr(prev.effects,     next.effects)
+      sameArr(prev.analyses, next.analyses) &&
+      sameArr(prev.effects, next.effects)
       ? prev                 // nothing really changed
       : next,                // commit – triggers one fetch
   );
