@@ -76,91 +76,103 @@ interface Props {
 
 const ClusterEnrichment = forwardRef<ClusterEnrichmentHandle, Props>(
   ({ dataEndpoint, nodeDetailsEndpoint, onGenesSelect }, ref) => {
-    const graphRef   = useRef<ClusterGraphHandle>(null);
-    const barplotRef = useRef<EnrichmentBarplotHandle>(null);
+  const graphRef   = useRef<ClusterGraphHandle>(null);
+  const barplotRef = useRef<EnrichmentBarplotHandle>(null);
 
-    /* expose handle to parent */
-    useImperativeHandle(ref, () => ({
-      getGenes: () =>
-        graphRef.current?.getCy()?.nodes().map((n) => n.id()) ?? [],
-      selectGenes(ids) {
-        barplotRef.current?.highlightGene(null);
-        graphRef.current?.selectNodes(ids);
-      },
-      getPalettes: () => ({
-        source : ANALYSIS_PALETTE,
-        effect : EFFECT_PALETTE,
-        cluster: palette,
-      }),
-    }));
+  /* expose handle to parent */
+  useImperativeHandle(ref, () => ({
+    getGenes: () =>
+      graphRef.current?.getCy()?.nodes().map((n) => n.id()) ?? [],
+    selectGenes(ids) {
+      barplotRef.current?.highlightGene(null);
+      graphRef.current?.selectNodes(ids);
+    },
+    getPalettes: () => ({
+      source : ANALYSIS_PALETTE,
+      effect : EFFECT_PALETTE,
+      cluster: palette,
+    }),
+  }));
 
-    /* ---------------- data + filter state --------------------------- */
-    const [rows,   setRows]   = useState<ElementDefinition[]>([]);
-    const [edges,  setEdges]  = useState<ElementDefinition[]>([]);
-    const [enrich, setEnrich] = useState<Pathway[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [error,   setError]   = useState<string | null>(null);
+  /* ---------------- data + filter state --------------------------- */
+  const [rows,   setRows]   = useState<ElementDefinition[]>([]);
+  const [edges,  setEdges]  = useState<ElementDefinition[]>([]);
+  const [enrich, setEnrich] = useState<Pathway[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error,   setError]   = useState<string | null>(null);
 
-    /* filters come from ControlPanel */
-    const [ringKey, setRingKey] = useState<string | undefined>("effect");
-    const [filters, setFilters] = useState<Filters>({
-      confidence : 0.4,
-      edgeSources: DEFAULT_EDGE_SOURCES,
-      analyses   : Object.keys(ANALYSIS_PALETTE),
-      effects    : ["Suppressor", "Driver"],
-    });
+  /* filters come from ControlPanel */
+  const [ringKey, setRingKey] = useState<string | undefined>("effect");
+  const [filters, setFilters] = useState<Filters>({
+    confidence : 0.4,
+    edgeSources: DEFAULT_EDGE_SOURCES,
+    analyses   : Object.keys(ANALYSIS_PALETTE),
+    effects    : ["Suppressor", "Driver"],
+  });
 
-    /* utilities (place near other helpers) */
-    /* helper: sort + dedupe */
-    const canon = (arr: string[]) =>
-    Array.from(new Set(arr)).sort();          // ① unique & alphabetical
+  /* utilities (place near other helpers) */
+  /* helper: sort + dedupe */
+  const canon = (arr: string[]) =>
+  Array.from(new Set(arr)).sort();          // ① unique & alphabetical
 
-    /* compare two canonical arrays (both already sorted) */
-    const sameArr = (a: string[], b: string[]) =>
-    a.length === b.length && a.every((v, i) => v === b[i]);
+  /* compare two canonical arrays (both already sorted) */
+  const sameArr = (a: string[], b: string[]) =>
+  a.length === b.length && a.every((v, i) => v === b[i]);
 
-    /* replace updateFilters */
-    const updateFilters = useCallback((f: Filters) => {
-    const next: Filters = {
-        confidence : f.confidence,
-        edgeSources: canon(f.edgeSources),      // ② normalise
-        analyses   : canon(f.analyses),         // ②
-        effects    : canon(f.effects),          // ②
-    };
+  /* replace updateFilters */
+  const updateFilters = useCallback((f: Filters) => {
+  const next: Filters = {
+      confidence : f.confidence,
+      edgeSources: canon(f.edgeSources),      // ② normalise
+      analyses   : canon(f.analyses),         // ②
+      effects    : canon(f.effects),          // ②
+  };
 
-    setFilters((prev) =>
-        prev.confidence === next.confidence &&
-        sameArr(prev.edgeSources, next.edgeSources) &&
-        sameArr(prev.analyses,    next.analyses) &&
-        sameArr(prev.effects,     next.effects)
-        ? prev                 // nothing really changed
-        : next,                // commit – triggers one fetch
-    );
-    }, []);
+  setFilters((prev) =>
+      prev.confidence === next.confidence &&
+      sameArr(prev.edgeSources, next.edgeSources) &&
+      sameArr(prev.analyses,    next.analyses) &&
+      sameArr(prev.effects,     next.effects)
+      ? prev                 // nothing really changed
+      : next,                // commit – triggers one fetch
+  );
+  }, []);
 
-    /* refetch whenever filters change */
-    useEffect(() => {
-      let cancel = false;
-      setLoading(true);
-      fetchData(dataEndpoint, filters)
-        .then(({ nodes, edges, enrichment }) => {
-          if (cancel) return;
-          setRows(nodes);
-          setEdges(edges);
-          setEnrich(enrichment);
-          setError(null);
-        })
-        .catch((e) => !cancel && setError((e as Error).message))
-        .finally(() => !cancel && setLoading(false));
-      return () => {cancel = true};
-    }, [dataEndpoint, filters]);
+  /* refetch whenever filters change */
+  useEffect(() => {
+    let cancel = false;
+    setLoading(true);
+    fetchData(dataEndpoint, filters)
+      .then(({ nodes, edges, enrichment }) => {
+        if (cancel) return;
+        setRows(nodes);
+        setEdges(edges);
+        setEnrich(enrichment);
+        setError(null);
+      })
+      .catch((e) => !cancel && setError((e as Error).message))
+      .finally(() => !cancel && setLoading(false));
+    return () => {cancel = true};
+  }, [dataEndpoint, filters]);
 
-    const palette = useMemo(
-      () => generatePalette(rows, 'cluster'),
-      [rows],
-    );
+  const palette = useMemo(
+    () => generatePalette(rows, 'cluster'),
+    [rows],
+  );
 
   /* -------------------------------------------------------------------------- */
+  function inlineComputedStyles(el: SVGElement | HTMLElement) {
+    // Walk the whole subtree
+    el.querySelectorAll<SVGGraphicsElement | HTMLElement>('*').forEach(node => {
+      const cs = window.getComputedStyle(node);
+      // Illustrator cares mainly about fill, stroke, font
+      if (cs.fill && cs.fill !== 'none')   node.setAttribute('fill',   cs.fill);
+      if (cs.stroke && cs.stroke !== 'none') node.setAttribute('stroke', cs.stroke);
+      // if (cs.font) node.setAttribute('font-family', cs.font);
+      // Add others if you rely on them (stroke-width, opacity, etc.)
+    });
+  };
+
   /* helper: add viewBox if missing & strip fixed dimensions                    */
   function normaliseSvg(svg: SVGSVGElement) {
     // remove width/height attributes – keeps things scalable
@@ -210,8 +222,6 @@ const ClusterEnrichment = forwardRef<ClusterEnrichmentHandle, Props>(
     gWrap.setAttribute('transform', `translate(${-gVB.x} ${-gVB.y})`);
     graphSvg.removeAttribute("viewBox");
     gWrap.appendChild(graphSvg);
-    console.log(bVB)
-    console.log(gVB)
 
     const bWrap = document.createElementNS(NS, 'g');
     bWrap.setAttribute(
@@ -222,7 +232,6 @@ const ClusterEnrichment = forwardRef<ClusterEnrichmentHandle, Props>(
     bWrap.appendChild(barSvg);
 
     /* 3 ── root svg */
-    console.log(width, height)
     const root = document.createElementNS(NS, 'svg');
     root.setAttribute('xmlns', NS);
     root.setAttribute('xmlns:xlink', 'http://www.w3.org/1999/xlink');
@@ -237,9 +246,9 @@ const ClusterEnrichment = forwardRef<ClusterEnrichmentHandle, Props>(
 
   async function exportFigures() {
     /* 1 ── collect */
-    const cy        = graphRef.current?.getCy?.();
+    const cy = graphRef.current?.getCy?.();
     const graphHTML = cy?.svg({ full: true, scale: 0.5 });
-    const barSvgEl  = barplotRef.current?.getSVG?.()?.cloneNode(true);
+    const barSvgEl = barplotRef.current?.getSVG?.() as SVGSVGElement;
 
     if (!graphHTML || !barSvgEl) {
       alert('Graph or bar-plot not ready – aborting export.');
@@ -251,7 +260,8 @@ const ClusterEnrichment = forwardRef<ClusterEnrichmentHandle, Props>(
       .parseFromString(graphHTML, 'image/svg+xml')
       .documentElement as SVGSVGElement;
 
-    const barSvg = barSvgEl as SVGSVGElement;
+    inlineComputedStyles(barSvgEl);
+    const barSvg = barSvgEl.cloneNode(true) as SVGSVGElement;
 
     /* 3 ── normalise */
     [graphSvg, barSvg].forEach(normaliseSvg);
@@ -260,9 +270,9 @@ const ClusterEnrichment = forwardRef<ClusterEnrichmentHandle, Props>(
     const composite = createCompositeSvg(graphSvg, barSvg);
 
     /* 5 ── download */
-    const out  = new XMLSerializer().serializeToString(composite);
+    const out = new XMLSerializer().serializeToString(composite);
     const blob = new Blob([out], { type: 'image/svg+xml' });
-    const url  = URL.createObjectURL(blob);
+    const url = URL.createObjectURL(blob);
 
     const a = Object.assign(document.createElement('a'), {
       href: url,
@@ -273,66 +283,64 @@ const ClusterEnrichment = forwardRef<ClusterEnrichmentHandle, Props>(
   }
 
 
+  if (error)   return <div className="p-4 text-red-600">{error}</div>;
 
-    if (error)   return <div className="p-4 text-red-600">{error}</div>;
+  /* ------------------- render ------------------------------------ */
+  return (
+    <div className="h-full flex flex-col gap-2">
+      <ControlPanel
+        graphRef={graphRef}
+        activeRing={ringKey}
+        activeEdgeSources={filters.edgeSources}
+        onFiltersChange={updateFilters}
+        onExportFigures={exportFigures}
+        onActiveRingChange={(value) => {
+          graphRef.current?.drawRing(
+            value === 'none' ? { key: undefined } : { key: value },
+          );
+          setRingKey(value);
+        }}
+      />
 
-    /* ------------------- render ------------------------------------ */
-    return (
-      <div className="h-full flex flex-col gap-2">
-        <ControlPanel
-          graphRef={graphRef}
-          activeRing={ringKey}
-          activeEdgeSources={filters.edgeSources}
-          onFiltersChange={updateFilters}
-          onExportFigures={exportFigures}
-          onActiveRingChange={(value) => {
-            graphRef.current?.drawRing(
-              value === 'none' ? { key: undefined } : { key: value },
-            );
-            setRingKey(value);
-          }}
-        />
+      {loading && (
+          <div className="p-4 text-gray-500 m-auto">Loading data...</div>
+      )}
+      {!loading && (
+        <div className="flex-grow flex overflow-hidden">
+          <DynamicContainer>
+            <ClusterGraph
+              ref={graphRef}
+              nodes={rows}
+              edges={edges}
+              palette={palette}
+              sourcePalette={ANALYSIS_PALETTE}
+              effectPalette={EFFECT_PALETTE}
+              ringKey={ringKey}
+              nodeDetailsEndpoint={nodeDetailsEndpoint}
+              /* hover → highlight */
+              onNodeMouseEnter={(id) => barplotRef.current?.highlightGene(id)}
+              onNodeMouseLeave={()   => barplotRef.current?.highlightGene(null)}
+              onNodesSelect={onGenesSelect}
+            />
 
-        {loading && (
-            <div className="p-4 text-gray-500">Loading data...</div>
-        )}
-        {!loading && (
-          <div className="flex-grow flex overflow-hidden">
-            <DynamicContainer>
-              <ClusterGraph
-                ref={graphRef}
-                nodes={rows}
-                edges={edges}
-                palette={palette}
-                sourcePalette={ANALYSIS_PALETTE}
-                effectPalette={EFFECT_PALETTE}
-                ringKey={ringKey}
-                nodeDetailsEndpoint={nodeDetailsEndpoint}
-                /* hover → highlight */
-                onNodeMouseEnter={(id) => barplotRef.current?.highlightGene(id)}
-                onNodeMouseLeave={()   => barplotRef.current?.highlightGene(null)}
-                onNodesSelect={onGenesSelect}
-              />
+            <EnrichmentBarplot
+              ref={barplotRef}
+              data={enrich}
+              palette={palette}
+              onBarHover={(p) => {
+                const g = graphRef.current;
+                if (!g) return;
+                g.highlightCluster(p?.cluster ?? null);
+                g.selectNodes(p?.genes ?? []);
+              }}
+            />
+          </DynamicContainer>
+        </div>
+      )}
 
-              <EnrichmentBarplot
-                ref={barplotRef}
-                data={enrich}
-                palette={palette}
-                onBarHover={(p) => {
-                  const g = graphRef.current;
-                  if (!g) return;
-                  g.highlightCluster(p?.cluster ?? null);
-                  g.selectNodes(p?.genes ?? []);
-                }}
-              />
-            </DynamicContainer>
-          </div>
-        )}
-
-      </div>
-    );
-  },
-);
+    </div>
+  );
+});
 
 ClusterEnrichment.displayName = 'ClusterEnrichment';
 export default ClusterEnrichment;
