@@ -60,24 +60,6 @@ const EFFECT_PALETTE = {
   Neutral   : '#888888',
 };
 
-function replaceRectsWithPaths(svg: SVGSVGElement) {
-  [...svg.querySelectorAll('rect')].forEach(r => {
-    const x  = +r.getAttribute('x')! || 0;
-    const y  = +r.getAttribute('y')! || 0;
-    const w  = +r.getAttribute('width')!  || 0;
-    const h  = +r.getAttribute('height')! || 0;
-
-    const p = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-    p.setAttribute('d', `M${x},${y}h${w}v${h}h-${w}Z`);
-    // copy presentation attributes you care about
-    ['fill','stroke','stroke-width','opacity'].forEach(attr => {
-      const v = r.getAttribute(attr);
-      if (v) p.setAttribute(attr, v);
-    });
-    r.parentNode!.replaceChild(p, r);
-  });
-}
-
 
 /* ---------- handle + props ------------------------------------------- */
 export interface ClusterEnrichmentHandle {
@@ -178,31 +160,116 @@ const ClusterEnrichment = forwardRef<ClusterEnrichmentHandle, Props>(
       [rows],
     );
 
-  async function exportFigures() {
-    const graphSVG = graphRef.current?.getCy()?.svg({ full: false });
-    const barplotSVG = barplotRef.current?.getSVG?.() as SVGElement | null;
+  /* -------------------------------------------------------------------------- */
+  /* helper: add viewBox if missing & strip fixed dimensions                    */
+  function normaliseSvg(svg: SVGSVGElement) {
+    // remove width/height attributes – keeps things scalable
+    svg.removeAttribute('width');
+    svg.removeAttribute('height');
 
-    if (!graphSVG || !barplotSVG) {
-      alert('One of the visualizations is not available for export.');
+    if (svg.hasAttribute('viewBox')) return; // already good
+
+    // fall back on <svg width="…" height="…"> or a live BBox measurement
+    let w = parseFloat(svg.getAttribute('width')  || '');
+    let h = parseFloat(svg.getAttribute('height') || '');
+
+    if (!w || !h) {
+      // attach off-DOM, measure, detach
+      const tmp = document.createElement('div');
+      tmp.style.position = 'absolute';
+      tmp.style.left = tmp.style.top = '-9999px';
+      document.body.appendChild(tmp);
+      tmp.appendChild(svg);
+      const bb = svg.getBBox();
+      w = bb.width;
+      h = bb.height;
+      tmp.remove();
+    }
+    if (w && h) svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
+  }
+
+  function createCompositeSvg(
+      graphSvg: SVGSVGElement,
+      barSvg:   SVGSVGElement,
+      gap = 40
+    ) {
+    const NS = 'http://www.w3.org/2000/svg';
+
+    /* 1 ── pull sizes straight from viewBox */
+    const gVB = graphSvg.viewBox.baseVal;
+    const bVB = barSvg.viewBox.baseVal;
+
+    const gW = gVB.width,  gH = gVB.height;
+    const bW = bVB.width,  bH = bVB.height;
+
+    const width = gW + gap + bW
+    const height = Math.max(gH, bH) + 10; // small margin
+
+    /* 2 ── wrap each panel so we can shift them without touching internals */
+    const gWrap = document.createElementNS(NS, 'g');
+    gWrap.setAttribute('transform', `translate(${-gVB.x} ${-gVB.y})`);
+    graphSvg.removeAttribute("viewBox");
+    gWrap.appendChild(graphSvg);
+    console.log(bVB)
+    console.log(gVB)
+
+    const bWrap = document.createElementNS(NS, 'g');
+    bWrap.setAttribute(
+      'transform',
+      `translate(${gVB.x + gW + gap} 0)`,
+    );
+    barSvg.removeAttribute("viewBox")
+    bWrap.appendChild(barSvg);
+
+    /* 3 ── root svg */
+    console.log(width, height)
+    const root = document.createElementNS(NS, 'svg');
+    root.setAttribute('xmlns', NS);
+    root.setAttribute('xmlns:xlink', 'http://www.w3.org/1999/xlink');
+    root.setAttribute('width',  String(width));
+    root.setAttribute('height', String(height));
+    root.setAttribute('viewBox', `0 0 ${width} ${height}`);
+
+    root.appendChild(gWrap);
+    root.appendChild(bWrap);
+    return root;
+  }
+
+  async function exportFigures() {
+    /* 1 ── collect */
+    const cy        = graphRef.current?.getCy?.();
+    const graphHTML = cy?.svg({ full: true, scale: 0.5 });
+    const barSvgEl  = barplotRef.current?.getSVG?.()?.cloneNode(true);
+
+    if (!graphHTML || !barSvgEl) {
+      alert('Graph or bar-plot not ready – aborting export.');
       return;
     }
 
-    // Combine into PDF
-    const pdf = new jsPDF({ orientation: 'landscape', unit: 'pt' });
+    /* 2 ── to elements */
+    const graphSvg = new DOMParser()
+      .parseFromString(graphHTML, 'image/svg+xml')
+      .documentElement as SVGSVGElement;
 
-    const svgContainer1 = document.createElement('div');
-    svgContainer1.innerHTML = graphSVG;
-    const svgEl1 = svgContainer1.querySelector('svg');
+    const barSvg = barSvgEl as SVGSVGElement;
 
-    replaceRectsWithPaths(barplotSVG);          // 👈 make it safe
-    const svgEl2 = barplotSVG.cloneNode(true) as SVGElement;
+    /* 3 ── normalise */
+    [graphSvg, barSvg].forEach(normaliseSvg);
 
-    if (svgEl1 && svgEl2) {
-      await svg2pdf(svgEl1, pdf, {  yOffset: 20 });
-      pdf.addPage();
-      await svg2pdf(svgEl2, pdf, { xOffset: 20, yOffset: 20 });
-      pdf.save('gene-cluster-enrichment.pdf');
-    }
+    /* 4 ── compose */
+    const composite = createCompositeSvg(graphSvg, barSvg);
+
+    /* 5 ── download */
+    const out  = new XMLSerializer().serializeToString(composite);
+    const blob = new Blob([out], { type: 'image/svg+xml' });
+    const url  = URL.createObjectURL(blob);
+
+    const a = Object.assign(document.createElement('a'), {
+      href: url,
+      download: 'gene-cluster-enrichment.svg',
+    });
+    a.click();
+    URL.revokeObjectURL(url);
   }
 
 
